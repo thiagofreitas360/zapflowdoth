@@ -6,9 +6,9 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-hidden bg-background flex">
       <AppSidebar />
-      <main className="ml-[var(--sidebar-width)]">
+      <main className="ml-[var(--sidebar-width)] flex-1 h-screen overflow-hidden">
         {children}
       </main>
     </div>
