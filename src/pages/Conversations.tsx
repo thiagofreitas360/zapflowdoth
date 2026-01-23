@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { LeadList } from "@/components/conversations/LeadList";
 import { ChatArea } from "@/components/conversations/ChatArea";
-import { leads, messages, funnels, Message } from "@/data/mockData";
+import { leads as initialLeads, messages, funnels, Message, Lead } from "@/data/mockData";
 
 export default function Conversations() {
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(leads[0]?.id || null);
+  const [leadsList, setLeadsList] = useState<Lead[]>(initialLeads);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(leadsList[0]?.id || null);
   const [chatMessages, setChatMessages] = useState<Message[]>(messages);
 
-  const selectedLead = leads.find((l) => l.id === selectedLeadId) || null;
+  const selectedLead = leadsList.find((l) => l.id === selectedLeadId) || null;
   const leadMessages = chatMessages.filter((m) => m.leadId === selectedLeadId);
 
   const handleSendMessage = (content: string) => {
@@ -33,13 +34,22 @@ export default function Conversations() {
     }
   };
 
+  const handleTogglePin = (leadId: string) => {
+    setLeadsList((prev) =>
+      prev.map((lead) =>
+        lead.id === leadId ? { ...lead, isPinned: !lead.isPinned } : lead
+      )
+    );
+  };
+
   return (
     <div className="h-screen flex">
       <div className="w-[360px] flex-shrink-0">
         <LeadList
-          leads={leads}
+          leads={leadsList}
           selectedLeadId={selectedLeadId}
           onSelectLead={setSelectedLeadId}
+          onTogglePin={handleTogglePin}
         />
       </div>
       <div className="flex-1">
