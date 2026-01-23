@@ -1,9 +1,6 @@
 import { useState, useRef } from "react";
 import { 
   Plus, 
-  Workflow, 
-  Play, 
-  MoreVertical, 
   Clock, 
   FileText, 
   Mic, 
@@ -14,7 +11,12 @@ import {
   Edit2,
   Keyboard,
   Upload,
-  X
+  X,
+  Search,
+  Heart,
+  ChevronRight,
+  MessageSquare,
+  Play
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -50,14 +52,70 @@ const stepLabels = {
   question: "Pergunta",
 };
 
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}min ${seconds}s`;
+}
+
+function countStepTypes(steps: FunnelStep[]) {
+  return {
+    audio: steps.filter(s => s.type === "audio").length,
+    image: steps.filter(s => s.type === "image").length,
+    text: steps.filter(s => s.type === "text").length,
+    document: steps.filter(s => s.type === "document").length,
+  };
+}
+
 export default function Funnels() {
   const [funnelsList, setFunnelsList] = useState<Funnel[]>(initialFunnels);
   const [selectedFunnelId, setSelectedFunnelId] = useState<string | null>(null);
   const [editingStep, setEditingStep] = useState<FunnelStep | null>(null);
   const [isAddingStep, setIsAddingStep] = useState(false);
   const [newStepType, setNewStepType] = useState<FunnelStep["type"]>("text");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const selectedFunnel = funnelsList.find((f) => f.id === selectedFunnelId);
+
+  const filteredFunnels = funnelsList.filter(funnel => 
+    funnel.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    funnel.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const toggleFavorite = (funnelId: string) => {
+    setFavorites(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(funnelId)) {
+        newSet.delete(funnelId);
+      } else {
+        newSet.add(funnelId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    const newList = [...funnelsList];
+    const draggedItem = newList[draggedIndex];
+    newList.splice(draggedIndex, 1);
+    newList.splice(index, 0, draggedItem);
+    setFunnelsList(newList);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
 
   const handleUpdateStep = (funnelId: string, stepId: string, updates: Partial<FunnelStep>) => {
     setFunnelsList((prev) =>
@@ -101,7 +159,6 @@ export default function Funnels() {
     );
     setIsAddingStep(false);
     
-    // Auto open edit dialog for media types
     if (["audio", "image", "document"].includes(type)) {
       setTimeout(() => setEditingStep(newStep), 100);
     }
@@ -119,160 +176,230 @@ export default function Funnels() {
     );
   };
 
+  // Reorder steps via drag
+  const handleStepDragStart = (stepIndex: number) => {
+    return stepIndex;
+  };
+
+  const handleStepReorder = (funnelId: string, fromIndex: number, toIndex: number) => {
+    setFunnelsList((prev) =>
+      prev.map((funnel) => {
+        if (funnel.id !== funnelId) return funnel;
+        const newSteps = [...funnel.steps];
+        const [movedStep] = newSteps.splice(fromIndex, 1);
+        newSteps.splice(toIndex, 0, movedStep);
+        return { ...funnel, steps: newSteps };
+      })
+    );
+  };
+
   return (
-    <div className="min-h-screen p-8">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Funis de Mensagens</h1>
-          <p className="text-muted-foreground">Configure sequências automáticas para seus leads</p>
+      <div className="flex-shrink-0 p-6 border-b border-border">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold">Funis</h1>
+            <p className="text-sm text-muted-foreground">Gerencie suas sequências automáticas</p>
+          </div>
+          <Button className="bg-primary hover:bg-primary/90">
+            <Plus className="w-4 h-4 mr-2" />
+            Adicionar
+          </Button>
         </div>
-        <Button className="bg-primary hover:bg-primary/90">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Funil
-        </Button>
+        
+        {/* Search bar */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-secondary border-0"
+          />
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Funnel Cards */}
-        <div className="lg:col-span-2 grid sm:grid-cols-2 gap-4">
-          {funnelsList.map((funnel, index) => (
-            <Card
-              key={funnel.id}
-              onClick={() => setSelectedFunnelId(funnel.id)}
-              className={cn(
-                "funnel-card cursor-pointer animate-fade-in",
-                selectedFunnelId === funnel.id && "border-primary bg-primary/5"
-              )}
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="flex items-start justify-between mb-4">
+      {/* Main content */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* Funnel List */}
+        <div className="w-[55%] border-r border-border flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {filteredFunnels.map((funnel, index) => {
+              const stepCounts = countStepTypes(funnel.steps);
+              const isFavorite = favorites.has(funnel.id);
+              const isSelected = selectedFunnelId === funnel.id;
+              
+              return (
                 <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${funnel.color}20` }}
+                  key={funnel.id}
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => setSelectedFunnelId(funnel.id)}
+                  className={cn(
+                    "group flex items-center gap-3 p-4 rounded-lg cursor-pointer transition-all",
+                    "bg-card border border-border hover:border-primary/50",
+                    isSelected && "border-primary bg-primary/5",
+                    draggedIndex === index && "opacity-50"
+                  )}
                 >
-                  <Workflow className="w-5 h-5" style={{ color: funnel.color }} />
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <h3 className="font-semibold text-lg mb-1">{funnel.name}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{funnel.description}</p>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Conversões: </span>
-                    <span className="font-semibold text-accent">{funnel.conversions}</span>
+                  {/* Drag handle */}
+                  <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+                    <GripVertical className="w-5 h-5" />
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Enviados: </span>
-                    <span className="font-semibold">{funnel.totalSent}</span>
+
+                  {/* Funnel info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold truncate">{funnel.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatDuration(funnel.totalDurationSeconds)}
+                      </span>
+                      {stepCounts.audio > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Mic className="w-3 h-3" />
+                          {stepCounts.audio}
+                        </span>
+                      )}
+                      {stepCounts.image > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Image className="w-3 h-3" />
+                          {stepCounts.image}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <MessageSquare className="w-3 h-3" />
+                        {funnel.steps.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-8 w-8 transition-colors",
+                        isFavorite ? "text-pink-500 hover:text-pink-600" : "text-muted-foreground hover:text-foreground"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(funnel.id);
+                      }}
+                    >
+                      <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFunnelId(funnel.id);
+                      }}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                    <ChevronRight className={cn(
+                      "w-4 h-4 text-muted-foreground transition-transform",
+                      isSelected && "text-primary rotate-90"
+                    )} />
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" className="text-primary hover:text-primary hover:bg-primary/10">
-                  <Play className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Steps Preview */}
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-xs text-muted-foreground mb-2">{funnel.steps.length} etapas</p>
-                <div className="flex items-center gap-1">
-                  {funnel.steps.map((step) => {
-                    const Icon = stepIcons[step.type];
-                    return (
-                      <div
-                        key={step.id}
-                        className="w-7 h-7 rounded bg-secondary flex items-center justify-center"
-                        title={stepLabels[step.type]}
-                      >
-                        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </Card>
-          ))}
-
-          {/* Add New Card */}
-          <Card className="funnel-card border-dashed cursor-pointer flex flex-col items-center justify-center min-h-[200px] hover:border-primary/50 hover:bg-primary/5 transition-all">
-            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-3">
-              <Plus className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <p className="font-medium text-muted-foreground">Criar novo funil</p>
-          </Card>
+              );
+            })}
+          </div>
         </div>
 
         {/* Funnel Detail Panel */}
-        <div className="lg:col-span-1">
+        <div className="w-[45%] flex flex-col overflow-hidden bg-card/50">
           {selectedFunnel ? (
-            <Card className="p-6 animate-scale-in">
-              <h3 className="font-semibold text-lg mb-4">Etapas do Funil</h3>
-              <div className="space-y-3">
+            <>
+              {/* Detail Header */}
+              <div className="flex-shrink-0 p-4 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: selectedFunnel.color }}
+                  />
+                  <h3 className="font-semibold truncate">{selectedFunnel.name}</h3>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-xs"
+                  onClick={() => setIsAddingStep(true)}
+                >
+                  <Plus className="w-3 h-3" />
+                  Adicionar item
+                </Button>
+              </div>
+
+              {/* Steps List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {selectedFunnel.steps.map((step, index) => (
-                  <StepItem 
-                    key={step.id} 
-                    step={step} 
+                  <StepItemRow
+                    key={step.id}
+                    step={step}
                     index={index}
                     funnelId={selectedFunnel.id}
-                    onUpdate={handleUpdateStep}
-                    onDelete={handleDeleteStep}
+                    totalSteps={selectedFunnel.steps.length}
                     onEdit={setEditingStep}
+                    onDelete={handleDeleteStep}
+                    onReorder={handleStepReorder}
                   />
                 ))}
               </div>
-              
-              {/* Add Step Dialog */}
-              <Dialog open={isAddingStep} onOpenChange={setIsAddingStep}>
-                <DialogTrigger asChild>
-                  <Button className="w-full mt-6 bg-primary hover:bg-primary/90">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Etapa
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Adicionar Nova Etapa</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="grid grid-cols-3 gap-2">
-                      {(["text", "delay", "question", "audio", "image", "document"] as const).map((type) => {
-                        const Icon = stepIcons[type];
-                        return (
-                          <Button
-                            key={type}
-                            variant={newStepType === type ? "default" : "outline"}
-                            className="flex flex-col h-20 gap-2"
-                            onClick={() => setNewStepType(type)}
-                          >
-                            <Icon className="w-5 h-5" />
-                            <span className="text-xs">{stepLabels[type]}</span>
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    <Button 
-                      className="w-full"
-                      onClick={() => handleAddStep(selectedFunnel.id, newStepType)}
-                    >
-                      Adicionar {stepLabels[newStepType]}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </Card>
+            </>
           ) : (
-            <Card className="p-6 flex flex-col items-center justify-center min-h-[300px] text-center">
-              <Workflow className="w-12 h-12 text-muted-foreground mb-4" />
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
+                <Play className="w-8 h-8 text-muted-foreground" />
+              </div>
               <p className="text-muted-foreground">Selecione um funil para ver as etapas</p>
-            </Card>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Add Step Dialog */}
+      <Dialog open={isAddingStep} onOpenChange={setIsAddingStep}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Nova Etapa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-3 gap-2">
+              {(["text", "delay", "question", "audio", "image", "document"] as const).map((type) => {
+                const Icon = stepIcons[type];
+                return (
+                  <Button
+                    key={type}
+                    variant={newStepType === type ? "default" : "outline"}
+                    className="flex flex-col h-20 gap-2"
+                    onClick={() => setNewStepType(type)}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-xs">{stepLabels[type]}</span>
+                  </Button>
+                );
+              })}
+            </div>
+            <Button 
+              className="w-full"
+              onClick={() => selectedFunnel && handleAddStep(selectedFunnel.id, newStepType)}
+            >
+              Adicionar {stepLabels[newStepType]}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Step Dialog */}
       <Dialog open={!!editingStep} onOpenChange={(open) => !open && setEditingStep(null)}>
@@ -286,7 +413,6 @@ export default function Funnels() {
               funnelId={selectedFunnel.id}
               onUpdate={(funnelId, stepId, updates) => {
                 handleUpdateStep(funnelId, stepId, updates);
-                // Update the editing step with new values
                 setEditingStep((prev) => prev ? { ...prev, ...updates } : null);
               }}
               onClose={() => setEditingStep(null)}
@@ -298,73 +424,104 @@ export default function Funnels() {
   );
 }
 
-interface StepItemProps {
+interface StepItemRowProps {
   step: FunnelStep;
   index: number;
   funnelId: string;
-  onUpdate: (funnelId: string, stepId: string, updates: Partial<FunnelStep>) => void;
-  onDelete: (funnelId: string, stepId: string) => void;
+  totalSteps: number;
   onEdit: (step: FunnelStep) => void;
+  onDelete: (funnelId: string, stepId: string) => void;
+  onReorder: (funnelId: string, fromIndex: number, toIndex: number) => void;
 }
 
-function StepItem({ step, index, funnelId, onUpdate, onDelete, onEdit }: StepItemProps) {
+function StepItemRow({ step, index, funnelId, totalSteps, onEdit, onDelete, onReorder }: StepItemRowProps) {
   const Icon = stepIcons[step.type];
+  const [draggedOver, setDraggedOver] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("stepIndex", index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDraggedOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDraggedOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDraggedOver(false);
+    const fromIndex = parseInt(e.dataTransfer.getData("stepIndex"));
+    if (fromIndex !== index) {
+      onReorder(funnelId, fromIndex, index);
+    }
+  };
+
+  // Calculate delay display
+  const getDelayText = () => {
+    if (step.type === "delay" && step.delay) {
+      return `Enviando após ${step.delay}min`;
+    }
+    // Sum delays before this step
+    return null;
+  };
 
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 border border-border/50 group hover:border-primary/30 transition-colors">
-      <div className="flex flex-col items-center gap-1">
-        <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
-        <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-semibold">
-          {index + 1}
-        </div>
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={cn(
+        "group flex items-center gap-3 p-3 rounded-lg transition-all",
+        "bg-secondary/80 border border-border/50 hover:border-primary/30",
+        draggedOver && "border-primary bg-primary/10"
+      )}
+    >
+      {/* Drag handle */}
+      <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+        <GripVertical className="w-4 h-4" />
       </div>
+
+      {/* Icon */}
+      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4 text-primary" />
+      </div>
+
+      {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <Icon className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground capitalize">
-            {stepLabels[step.type]}
-          </span>
-          {step.delay && (
-            <span className="text-xs text-warning">+{step.delay}min</span>
-          )}
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm truncate">{stepLabels[step.type].toUpperCase()} {index + 1}</span>
           {step.showTypingIndicator && (
             <span className="text-xs text-primary flex items-center gap-1">
               <Keyboard className="w-3 h-3" />
-              digitando...
             </span>
           )}
         </div>
-        
-        {/* Content display based on type */}
-        {["audio", "image", "document"].includes(step.type) ? (
-          <div className="flex items-center gap-2">
-            {step.fileName ? (
-              <span className="text-sm text-accent truncate">📎 {step.fileName}</span>
-            ) : (
-              <span className="text-sm text-muted-foreground italic">Nenhum arquivo selecionado</span>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm truncate">{step.content}</p>
+        {step.type === "delay" && step.delay && (
+          <p className="text-xs text-muted-foreground">Enviando após {step.delay}min</p>
         )}
-        
-        {/* Question details */}
+        {step.type === "text" && (
+          <p className="text-xs text-muted-foreground truncate">{step.content}</p>
+        )}
         {step.type === "question" && step.question && (
-          <div className="mt-2 p-2 rounded bg-background/50 text-xs space-y-1">
-            <p className="text-muted-foreground">
-              ⏱️ Aguarda: {step.question.waitMinutes} min
-            </p>
-            <p className="text-muted-foreground truncate">
-              💬 Auto: {step.question.autoResponseText}
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground truncate">{step.question.questionText}</p>
+        )}
+        {["audio", "image", "document"].includes(step.type) && step.fileName && (
+          <p className="text-xs text-accent truncate">{step.fileName}</p>
         )}
       </div>
+
+      {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7"
+          className="h-7 w-7 bg-primary/80 hover:bg-primary text-primary-foreground"
           onClick={() => onEdit(step)}
         >
           <Edit2 className="w-3.5 h-3.5" />
@@ -372,7 +529,7 @@ function StepItem({ step, index, funnelId, onUpdate, onDelete, onEdit }: StepIte
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 text-destructive hover:text-destructive"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
           onClick={() => onDelete(funnelId, step.id)}
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -406,8 +563,6 @@ function EditStepForm({ step, funnelId, onUpdate, onClose }: EditStepFormProps) 
     const file = e.target.files?.[0];
     if (file) {
       setFileName(file.name);
-      // In a real app, you would upload the file here and get a URL
-      // For now, we'll create a fake URL to demonstrate the feature
       setFileUrl(URL.createObjectURL(file));
       setContent(file.name);
     }
