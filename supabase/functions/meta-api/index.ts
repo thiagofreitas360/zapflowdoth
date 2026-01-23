@@ -83,11 +83,34 @@ Deno.serve(async (req) => {
 
     let metaResponse;
 
+    // Helper function to validate phone numbers
+    const validatePhoneNumber = (phone: string): { valid: boolean; sanitized: string; error?: string } => {
+      const sanitized = phone.replace(/\D/g, "");
+      if (!sanitized) {
+        return { valid: false, sanitized: "", error: "Phone number is required" };
+      }
+      if (sanitized.length < 10) {
+        return { valid: false, sanitized, error: "Phone number too short (minimum 10 digits)" };
+      }
+      if (sanitized.length > 15) {
+        return { valid: false, sanitized, error: "Phone number too long (maximum 15 digits)" };
+      }
+      return { valid: true, sanitized };
+    };
+
     switch (action) {
       case "send_text": {
         if (!to || !message) {
           return new Response(
             JSON.stringify({ error: "to and message are required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const phoneValidation = validatePhoneNumber(to);
+        if (!phoneValidation.valid) {
+          return new Response(
+            JSON.stringify({ error: phoneValidation.error }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -101,7 +124,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             messaging_product: "whatsapp",
             recipient_type: "individual",
-            to: to.replace(/\D/g, ""), // Remove non-digits
+            to: phoneValidation.sanitized,
             type: "text",
             text: { body: message },
           }),
@@ -117,6 +140,14 @@ Deno.serve(async (req) => {
           );
         }
 
+        const templatePhoneValidation = validatePhoneNumber(to);
+        if (!templatePhoneValidation.valid) {
+          return new Response(
+            JSON.stringify({ error: templatePhoneValidation.error }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         metaResponse = await fetch(`${META_API_URL}/messages`, {
           method: "POST",
           headers: {
@@ -126,7 +157,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             messaging_product: "whatsapp",
             recipient_type: "individual",
-            to: to.replace(/\D/g, ""),
+            to: templatePhoneValidation.sanitized,
             type: "template",
             template: {
               name: template_name,
