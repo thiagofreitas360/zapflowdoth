@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Funnel, ActiveFunnel } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface FunnelQuickActionsProps {
   funnels: Funnel[];
@@ -51,7 +52,7 @@ export function FunnelQuickActions({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
-  // Show active funnel status
+  // Show active funnel status (per-lead lock)
   if (activeFunnel) {
     const funnel = funnels.find((f) => f.id === activeFunnel.funnelId);
     const progress = funnel 
@@ -92,52 +93,80 @@ export function FunnelQuickActions({
 
   return (
     <div className="px-4 py-3 border-t border-border bg-card/50 backdrop-blur-sm">
-      <div 
-        ref={scrollRef}
-        className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide scroll-smooth"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-shrink-0">
-          <Workflow className="w-4 h-4" />
-          <span>Funis:</span>
-        </div>
-        
-        {filteredFunnels.length === 0 ? (
-          <span className="text-sm text-muted-foreground italic">
-            Nenhum funil encontrado para "{filterText}"
+      <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground flex-shrink-0">
+        <Workflow className="w-4 h-4" />
+        <span>Funis rápidos:</span>
+        {filterText.trim() && (
+          <span className="text-primary text-xs">
+            (filtrando por "{filterText}")
           </span>
-        ) : (
-          filteredFunnels.map((funnel) => (
-            <Button
-              key={funnel.id}
-              onClick={() => onTrigger(funnel.id)}
-              variant="outline"
-              size="sm"
-              className={cn(
-                "flex-shrink-0 border-border/50 hover:border-primary hover:bg-primary/10 transition-all duration-200 group"
-              )}
-              style={{ 
-                borderLeftColor: funnel.color,
-                borderLeftWidth: "3px" 
-              }}
-            >
-              <span>{funnel.name}</span>
-              <ChevronRight className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </Button>
-          ))
-        )}
-        
-        {!filterText.trim() && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-shrink-0 text-primary hover:text-primary hover:bg-primary/10"
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            Sugestão AI
-          </Button>
         )}
       </div>
+      
+      <div 
+        ref={scrollRef}
+        className="relative overflow-x-auto pb-2"
+        style={{ 
+          scrollbarWidth: "thin",
+          scrollbarColor: "hsl(var(--primary)) hsl(var(--secondary))"
+        }}
+      >
+        <div className="flex items-center gap-2 min-w-max">
+          {filteredFunnels.length === 0 ? (
+            <span className="text-sm text-muted-foreground italic py-2">
+              Nenhum funil encontrado para "{filterText}"
+            </span>
+          ) : (
+            filteredFunnels.map((funnel) => (
+              <Button
+                key={funnel.id}
+                onClick={() => onTrigger(funnel.id)}
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "flex-shrink-0 border-border/50 hover:border-primary hover:bg-primary/10 transition-all duration-200 group whitespace-nowrap"
+                )}
+                style={{ 
+                  borderLeftColor: funnel.color,
+                  borderLeftWidth: "3px" 
+                }}
+              >
+                <span>{funnel.name}</span>
+                <ChevronRight className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Button>
+            ))
+          )}
+          
+          {!filterText.trim() && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-shrink-0 text-primary hover:text-primary hover:bg-primary/10 whitespace-nowrap"
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Sugestão AI
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      {/* Custom scrollbar styling */}
+      <style>{`
+        div[style*="scrollbar-width: thin"]::-webkit-scrollbar {
+          height: 6px;
+        }
+        div[style*="scrollbar-width: thin"]::-webkit-scrollbar-track {
+          background: hsl(var(--secondary));
+          border-radius: 3px;
+        }
+        div[style*="scrollbar-width: thin"]::-webkit-scrollbar-thumb {
+          background: hsl(var(--primary) / 0.5);
+          border-radius: 3px;
+        }
+        div[style*="scrollbar-width: thin"]::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--primary));
+        }
+      `}</style>
     </div>
   );
 }

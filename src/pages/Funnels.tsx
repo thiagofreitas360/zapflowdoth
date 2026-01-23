@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { 
   Plus, 
   Workflow, 
@@ -12,7 +12,9 @@ import {
   GripVertical,
   Trash2,
   Edit2,
-  Keyboard
+  Keyboard,
+  Upload,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,13 +31,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const stepIcons = {
   text: FileText,
@@ -82,7 +77,7 @@ export default function Funnels() {
     const newStep: FunnelStep = {
       id: `s${Date.now()}`,
       type,
-      content: type === "delay" ? "Aguardar" : type === "question" ? "Sua pergunta aqui" : "Nova mensagem",
+      content: type === "delay" ? "Aguardar" : type === "question" ? "Sua pergunta aqui" : "",
       delay: type === "delay" ? 5 : undefined,
       showTypingIndicator: type === "delay",
       question: type === "question" ? {
@@ -91,6 +86,8 @@ export default function Funnels() {
         waitMinutes: 5,
         autoResponseText: "Mensagem automática caso não responda",
       } : undefined,
+      fileUrl: ["audio", "image", "document"].includes(type) ? "" : undefined,
+      fileName: ["audio", "image", "document"].includes(type) ? "" : undefined,
     };
 
     setFunnelsList((prev) =>
@@ -103,6 +100,11 @@ export default function Funnels() {
       })
     );
     setIsAddingStep(false);
+    
+    // Auto open edit dialog for media types
+    if (["audio", "image", "document"].includes(type)) {
+      setTimeout(() => setEditingStep(newStep), 100);
+    }
   };
 
   const handleDeleteStep = (funnelId: string, stepId: string) => {
@@ -282,7 +284,11 @@ export default function Funnels() {
             <EditStepForm
               step={editingStep}
               funnelId={selectedFunnel.id}
-              onUpdate={handleUpdateStep}
+              onUpdate={(funnelId, stepId, updates) => {
+                handleUpdateStep(funnelId, stepId, updates);
+                // Update the editing step with new values
+                setEditingStep((prev) => prev ? { ...prev, ...updates } : null);
+              }}
               onClose={() => setEditingStep(null)}
             />
           )}
@@ -328,7 +334,19 @@ function StepItem({ step, index, funnelId, onUpdate, onDelete, onEdit }: StepIte
             </span>
           )}
         </div>
-        <p className="text-sm truncate">{step.content}</p>
+        
+        {/* Content display based on type */}
+        {["audio", "image", "document"].includes(step.type) ? (
+          <div className="flex items-center gap-2">
+            {step.fileName ? (
+              <span className="text-sm text-accent truncate">📎 {step.fileName}</span>
+            ) : (
+              <span className="text-sm text-muted-foreground italic">Nenhum arquivo selecionado</span>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm truncate">{step.content}</p>
+        )}
         
         {/* Question details */}
         {step.type === "question" && step.question && (
@@ -378,6 +396,44 @@ function EditStepForm({ step, funnelId, onUpdate, onClose }: EditStepFormProps) 
   const [questionText, setQuestionText] = useState(step.question?.questionText || "");
   const [waitMinutes, setWaitMinutes] = useState(step.question?.waitMinutes || 5);
   const [autoResponse, setAutoResponse] = useState(step.question?.autoResponseText || "");
+  const [fileName, setFileName] = useState(step.fileName || "");
+  const [fileUrl, setFileUrl] = useState(step.fileUrl || "");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isMediaType = ["audio", "image", "document"].includes(step.type);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+      // In a real app, you would upload the file here and get a URL
+      // For now, we'll create a fake URL to demonstrate the feature
+      setFileUrl(URL.createObjectURL(file));
+      setContent(file.name);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setFileName("");
+    setFileUrl("");
+    setContent("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const getAcceptedFileTypes = () => {
+    switch (step.type) {
+      case "audio":
+        return "audio/*";
+      case "image":
+        return "image/*";
+      case "document":
+        return ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt";
+      default:
+        return "";
+    }
+  };
 
   const handleSave = () => {
     const updates: Partial<FunnelStep> = {
@@ -396,6 +452,13 @@ function EditStepForm({ step, funnelId, onUpdate, onClose }: EditStepFormProps) 
         waitMinutes,
         autoResponseText: autoResponse,
       };
+      updates.content = questionText;
+    }
+
+    if (isMediaType) {
+      updates.fileName = fileName;
+      updates.fileUrl = fileUrl;
+      updates.content = fileName || content;
     }
 
     onUpdate(funnelId, step.id, updates);
@@ -404,12 +467,65 @@ function EditStepForm({ step, funnelId, onUpdate, onClose }: EditStepFormProps) 
 
   return (
     <div className="space-y-4 py-4">
-      {/* Content */}
-      {step.type !== "delay" && (
+      {/* File Upload for media types */}
+      {isMediaType && (
         <div>
-          <Label htmlFor="content">
-            {step.type === "question" ? "Pergunta" : "Conteúdo"}
+          <Label>
+            {step.type === "audio" && "Arquivo de Áudio"}
+            {step.type === "image" && "Arquivo de Imagem"}
+            {step.type === "document" && "Documento"}
           </Label>
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={getAcceptedFileTypes()}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          
+          {fileName ? (
+            <div className="mt-2 flex items-center gap-2 p-3 rounded-lg bg-secondary border border-border">
+              <div className="flex-1 flex items-center gap-2">
+                {step.type === "audio" && <Mic className="w-5 h-5 text-primary" />}
+                {step.type === "image" && <Image className="w-5 h-5 text-primary" />}
+                {step.type === "document" && <FileText className="w-5 h-5 text-primary" />}
+                <span className="text-sm truncate">{fileName}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                onClick={handleRemoveFile}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full mt-2 h-20 border-dashed flex flex-col gap-2"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="w-6 h-6 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                Clique para fazer upload
+              </span>
+            </Button>
+          )}
+          
+          <p className="text-xs text-muted-foreground mt-2">
+            {step.type === "audio" && "Formatos aceitos: MP3, OGG, WAV, M4A"}
+            {step.type === "image" && "Formatos aceitos: JPG, PNG, GIF, WebP"}
+            {step.type === "document" && "Formatos aceitos: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT"}
+          </p>
+        </div>
+      )}
+
+      {/* Content for text */}
+      {step.type === "text" && (
+        <div>
+          <Label htmlFor="content">Conteúdo</Label>
           <Textarea
             id="content"
             value={content}
@@ -437,7 +553,7 @@ function EditStepForm({ step, funnelId, onUpdate, onClose }: EditStepFormProps) 
       )}
 
       {/* Show typing indicator */}
-      {(step.type === "delay" || step.type === "text") && (
+      {(step.type === "delay" || step.type === "text" || isMediaType) && (
         <div className="flex items-center justify-between">
           <div>
             <p className="font-medium">Mostrar "digitando..."</p>
@@ -455,6 +571,17 @@ function EditStepForm({ step, funnelId, onUpdate, onClose }: EditStepFormProps) 
       {/* Question settings */}
       {step.type === "question" && (
         <>
+          <div>
+            <Label htmlFor="questionText">Pergunta</Label>
+            <Textarea
+              id="questionText"
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              className="mt-2 bg-secondary border-0"
+              rows={2}
+              placeholder="Digite sua pergunta..."
+            />
+          </div>
           <div>
             <Label htmlFor="wait">Tempo de espera pela resposta (minutos)</Label>
             <Input

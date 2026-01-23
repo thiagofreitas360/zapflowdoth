@@ -46,6 +46,8 @@ export interface FunnelStep {
   delay?: number;
   showTypingIndicator?: boolean;
   question?: FunnelQuestion;
+  fileUrl?: string; // For audio, image, document uploads
+  fileName?: string;
 }
 
 export interface Funnel {
@@ -237,7 +239,7 @@ export const funnels: Funnel[] = [
     steps: [
       { id: "s4", type: "text", content: "Oi! Sumiu? 👀", showTypingIndicator: true },
       { id: "s5", type: "delay", content: "Aguardar", delay: 10, showTypingIndicator: false },
-      { id: "s6", type: "audio", content: "audio_retencao.ogg", showTypingIndicator: false },
+      { id: "s6", type: "audio", content: "audio_retencao.ogg", fileUrl: "", fileName: "audio_retencao.ogg", showTypingIndicator: false },
     ],
   },
   {
@@ -250,7 +252,7 @@ export const funnels: Funnel[] = [
     totalDurationSeconds: 30,
     steps: [
       { id: "s7", type: "text", content: "Última chance! Oferta expira em 24h ⏰", showTypingIndicator: true },
-      { id: "s8", type: "document", content: "proposta_comercial.pdf", showTypingIndicator: false },
+      { id: "s8", type: "document", content: "proposta_comercial.pdf", fileUrl: "", fileName: "proposta_comercial.pdf", showTypingIndicator: false },
     ],
   },
   {
@@ -288,6 +290,85 @@ export const funnels: Funnel[] = [
       { id: "s11", type: "text", content: "🔥 OFERTA EXCLUSIVA só pra você!", showTypingIndicator: true },
       { id: "s12", type: "delay", content: "Aguardar", delay: 3, showTypingIndicator: true },
       { id: "s13", type: "text", content: "50% de desconto nas próximas 2 horas!", showTypingIndicator: false },
+    ],
+  },
+  {
+    id: "f6",
+    name: "Áudio Persuasivo",
+    description: "Mensagem de voz personalizada",
+    color: "#8B5CF6",
+    conversions: 28,
+    totalSent: 75,
+    totalDurationSeconds: 20,
+    steps: [
+      { id: "s14", type: "audio", content: "audio_persuasivo.ogg", fileUrl: "", fileName: "audio_persuasivo.ogg", showTypingIndicator: false },
+    ],
+  },
+  {
+    id: "f7",
+    name: "Material Rico",
+    description: "Envio de e-book e conteúdo",
+    color: "#14B8A6",
+    conversions: 65,
+    totalSent: 180,
+    totalDurationSeconds: 90,
+    steps: [
+      { id: "s15", type: "text", content: "Aqui está o material que prometi! 📚", showTypingIndicator: true },
+      { id: "s16", type: "delay", content: "Aguardar", delay: 2, showTypingIndicator: true },
+      { id: "s17", type: "document", content: "ebook_vendas.pdf", fileUrl: "", fileName: "ebook_vendas.pdf", showTypingIndicator: false },
+    ],
+  },
+  {
+    id: "f8",
+    name: "Depoimento Cliente",
+    description: "Prova social com imagem",
+    color: "#EF4444",
+    conversions: 40,
+    totalSent: 95,
+    totalDurationSeconds: 35,
+    steps: [
+      { id: "s18", type: "text", content: "Olha o que nossos clientes estão falando! ⭐", showTypingIndicator: true },
+      { id: "s19", type: "image", content: "depoimento.jpg", fileUrl: "", fileName: "depoimento.jpg", showTypingIndicator: false },
+    ],
+  },
+  {
+    id: "f9",
+    name: "Recuperação de Carrinho",
+    description: "Para leads que abandonaram",
+    color: "#F97316",
+    conversions: 22,
+    totalSent: 60,
+    totalDurationSeconds: 150,
+    steps: [
+      { id: "s20", type: "text", content: "Oi! Vi que você deixou algo no carrinho 🛒", showTypingIndicator: true },
+      { id: "s21", type: "delay", content: "Aguardar", delay: 5, showTypingIndicator: true },
+      { id: "s22", type: "text", content: "Posso te ajudar a finalizar?", showTypingIndicator: false },
+      {
+        id: "s23",
+        type: "question",
+        content: "Teve algum problema?",
+        question: {
+          enabled: true,
+          questionText: "Teve algum problema?",
+          waitMinutes: 10,
+          autoResponseText: "Estou aqui pra te ajudar! Me chama quando puder 😊"
+        }
+      },
+    ],
+  },
+  {
+    id: "f10",
+    name: "Urgência Final",
+    description: "Última tentativa de conversão",
+    color: "#DC2626",
+    conversions: 18,
+    totalSent: 45,
+    totalDurationSeconds: 60,
+    steps: [
+      { id: "s24", type: "text", content: "⚠️ ÚLTIMA CHANCE!", showTypingIndicator: true },
+      { id: "s25", type: "delay", content: "Aguardar", delay: 3, showTypingIndicator: true },
+      { id: "s26", type: "audio", content: "urgencia.ogg", fileUrl: "", fileName: "urgencia.ogg", showTypingIndicator: false },
+      { id: "s27", type: "text", content: "Decide agora e garante seu bônus! 🎁", showTypingIndicator: false },
     ],
   },
 ];
