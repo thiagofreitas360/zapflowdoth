@@ -27,29 +27,45 @@ interface ChatAreaProps {
 
 export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunnel }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
-  const [activeFunnel, setActiveFunnel] = useState<ActiveFunnel | null>(null);
+  // Per-lead active funnels map: leadId -> ActiveFunnel
+  const [activeFunnelsMap, setActiveFunnelsMap] = useState<Map<string, ActiveFunnel>>(new Map());
   const { toast } = useToast();
 
-  // Countdown timer for active funnel
+  // Get active funnel for current lead
+  const activeFunnel = lead ? activeFunnelsMap.get(lead.id) || null : null;
+
+  // Countdown timer for all active funnels
   useEffect(() => {
-    if (!activeFunnel) return;
+    if (activeFunnelsMap.size === 0) return;
 
     const interval = setInterval(() => {
-      setActiveFunnel((prev) => {
-        if (!prev) return null;
-        if (prev.remainingSeconds <= 1) {
-          toast({
-            title: "Funil concluído! ✅",
-            description: "Todas as mensagens foram enviadas.",
-          });
-          return null;
+      setActiveFunnelsMap((prev) => {
+        const newMap = new Map(prev);
+        let hasChanges = false;
+        
+        for (const [leadId, funnel] of newMap) {
+          if (funnel.remainingSeconds <= 1) {
+            newMap.delete(leadId);
+            hasChanges = true;
+            // Show toast only for current lead
+            if (lead && leadId === lead.id) {
+              toast({
+                title: "Funil concluído! ✅",
+                description: "Todas as mensagens foram enviadas.",
+              });
+            }
+          } else {
+            newMap.set(leadId, { ...funnel, remainingSeconds: funnel.remainingSeconds - 1 });
+            hasChanges = true;
+          }
         }
-        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
+        
+        return hasChanges ? newMap : prev;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [activeFunnel, toast]);
+  }, [activeFunnelsMap.size, lead, toast]);
 
   const handleSend = useCallback(() => {
     if (inputValue.trim()) {
@@ -59,24 +75,33 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
   }, [inputValue, onSendMessage]);
 
   const handleTriggerFunnel = useCallback((funnelId: string) => {
-    if (activeFunnel) {
+    if (!lead) return;
+    
+    // Check if THIS lead already has an active funnel
+    const currentLeadFunnel = activeFunnelsMap.get(lead.id);
+    if (currentLeadFunnel) {
       toast({
         title: "Aguarde! ⏳",
-        description: "Já existe um funil em andamento. Cancele-o primeiro.",
+        description: "Já existe um funil em andamento para este lead. Cancele-o primeiro.",
         variant: "destructive",
       });
       return;
     }
 
     const funnel = funnels.find((f) => f.id === funnelId);
-    if (!funnel || !lead) return;
+    if (!funnel) return;
 
-    setActiveFunnel({
-      funnelId,
-      leadId: lead.id,
-      startTime: Date.now(),
-      remainingSeconds: funnel.totalDurationSeconds,
-      currentStep: 0,
+    // Set active funnel for this specific lead
+    setActiveFunnelsMap((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(lead.id, {
+        funnelId,
+        leadId: lead.id,
+        startTime: Date.now(),
+        remainingSeconds: funnel.totalDurationSeconds,
+        currentStep: 0,
+      });
+      return newMap;
     });
 
     onTriggerFunnel(funnelId);
@@ -85,15 +110,22 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
       title: "Funil disparado! 🚀",
       description: `"${funnel.name}" será enviado em ${funnel.totalDurationSeconds}s.`,
     });
-  }, [activeFunnel, funnels, lead, onTriggerFunnel, toast]);
+  }, [activeFunnelsMap, funnels, lead, onTriggerFunnel, toast]);
 
   const handleCancelFunnel = useCallback(() => {
-    setActiveFunnel(null);
+    if (!lead) return;
+    
+    setActiveFunnelsMap((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(lead.id);
+      return newMap;
+    });
+    
     toast({
       title: "Funil cancelado",
       description: "O envio foi interrompido.",
     });
-  }, [toast]);
+  }, [lead, toast]);
 
   if (!lead) {
     return (
