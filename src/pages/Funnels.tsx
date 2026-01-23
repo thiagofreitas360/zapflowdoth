@@ -17,7 +17,10 @@ import {
   ChevronRight,
   MessageSquare,
   Play,
-  Loader2
+  Loader2,
+  MoreVertical,
+  Copy,
+  Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +35,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useFunnels, useCreateFunnel, useUpdateFunnel, useDeleteFunnel, useCreateFunnelStep, useUpdateFunnelStep, useDeleteFunnelStep, useReorderFunnelSteps } from "@/hooks/useFunnels";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useFunnels, useCreateFunnel, useUpdateFunnel, useDeleteFunnel, useCreateFunnelStep, useUpdateFunnelStep, useDeleteFunnelStep, useReorderFunnelSteps, useDuplicateFunnel, useRenameFunnel } from "@/hooks/useFunnels";
 import { useToast } from "@/hooks/use-toast";
 
 const stepIcons: Record<StepType, typeof FileText> = {
@@ -74,6 +83,8 @@ export default function Funnels() {
   const createFunnel = useCreateFunnel();
   const updateFunnel = useUpdateFunnel();
   const deleteFunnel = useDeleteFunnel();
+  const duplicateFunnel = useDuplicateFunnel();
+  const renameFunnel = useRenameFunnel();
   const createStep = useCreateFunnelStep();
   const updateStep = useUpdateFunnelStep();
   const deleteStep = useDeleteFunnelStep();
@@ -90,6 +101,11 @@ export default function Funnels() {
   const [newFunnelName, setNewFunnelName] = useState("");
   const [newFunnelDescription, setNewFunnelDescription] = useState("");
   const [newFunnelColor, setNewFunnelColor] = useState("#6E56CF");
+  
+  // Rename dialog state
+  const [isRenamingFunnel, setIsRenamingFunnel] = useState(false);
+  const [renamingFunnelId, setRenamingFunnelId] = useState<string | null>(null);
+  const [renamingFunnelName, setRenamingFunnelName] = useState("");
 
   const selectedFunnel = funnels.find((f) => f.id === selectedFunnelId);
 
@@ -119,6 +135,41 @@ export default function Funnels() {
 
   const handleToggleFavorite = async (funnel: Funnel) => {
     await updateFunnel.mutateAsync({ id: funnel.id, is_favorite: !funnel.is_favorite });
+  };
+
+  const handleDuplicateFunnel = async (funnelId: string) => {
+    await duplicateFunnel.mutateAsync(funnelId);
+  };
+
+  const handleDeleteFunnel = async (funnelId: string) => {
+    try {
+      await deleteFunnel.mutateAsync(funnelId);
+      if (selectedFunnelId === funnelId) {
+        setSelectedFunnelId(null);
+      }
+      toast({ title: "Funil excluído!", description: "O funil foi removido com sucesso." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao excluir funil." });
+    }
+  };
+
+  const handleOpenRenameDialog = (funnel: Funnel) => {
+    setRenamingFunnelId(funnel.id);
+    setRenamingFunnelName(funnel.name);
+    setIsRenamingFunnel(true);
+  };
+
+  const handleRenameFunnel = async () => {
+    if (!renamingFunnelId || !renamingFunnelName.trim()) return;
+    
+    try {
+      await renameFunnel.mutateAsync({ id: renamingFunnelId, name: renamingFunnelName.trim() });
+      setIsRenamingFunnel(false);
+      setRenamingFunnelId(null);
+      setRenamingFunnelName("");
+    } catch (error) {
+      // Error handled in mutation
+    }
   };
 
   const handleAddStep = async (funnelId: string, type: StepType) => {
@@ -293,6 +344,45 @@ export default function Funnels() {
                       >
                         <Heart className={cn("w-4 h-4", funnel.is_favorite && "fill-current")} />
                       </Button>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem 
+                            onClick={() => handleOpenRenameDialog(funnel)}
+                            className="gap-2"
+                          >
+                            <Pencil className="w-4 h-4" />
+                            Renomear
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDuplicateFunnel(funnel.id)}
+                            className="gap-2"
+                            disabled={duplicateFunnel.isPending}
+                          >
+                            <Copy className="w-4 h-4" />
+                            Duplicar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteFunnel(funnel.id)}
+                            className="gap-2 text-destructive focus:text-destructive"
+                            disabled={deleteFunnel.isPending}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      
                       <ChevronRight className={cn(
                         "w-4 h-4 text-muted-foreground transition-transform",
                         isSelected && "text-primary rotate-90"
@@ -402,6 +492,44 @@ export default function Funnels() {
               {createFunnel.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Criar Funil
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Funnel Dialog */}
+      <Dialog open={isRenamingFunnel} onOpenChange={setIsRenamingFunnel}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear Funil</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="renameFunnelName">Nome</Label>
+              <Input
+                id="renameFunnelName"
+                value={renamingFunnelName}
+                onChange={(e) => setRenamingFunnelName(e.target.value)}
+                placeholder="Nome do funil"
+                className="mt-2 bg-secondary border-0"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => setIsRenamingFunnel(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-primary hover:bg-primary/90"
+                onClick={handleRenameFunnel}
+                disabled={!renamingFunnelName.trim() || renameFunnel.isPending}
+              >
+                {renameFunnel.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Salvar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

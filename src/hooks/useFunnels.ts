@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Funnel, FunnelStep, QuestionSettings, StepType } from '@/types/database';
 import { useAuth } from './useAuth';
 import { Json } from '@/integrations/supabase/types';
+import { useToast } from './use-toast';
 
 export function useFunnels() {
   const { user } = useAuth();
@@ -115,6 +116,106 @@ export function useDeleteFunnel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['funnels'] });
+    },
+  });
+}
+
+export function useDuplicateFunnel() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (funnelId: string) => {
+      // 1. Fetch the original funnel
+      const { data: originalFunnel, error: funnelError } = await supabase
+        .from('funnels')
+        .select('*')
+        .eq('id', funnelId)
+        .single();
+
+      if (funnelError) throw funnelError;
+
+      // 2. Fetch the funnel steps
+      const { data: originalSteps, error: stepsError } = await supabase
+        .from('funnel_steps')
+        .select('*')
+        .eq('funnel_id', funnelId)
+        .order('order_position', { ascending: true });
+
+      if (stepsError) throw stepsError;
+
+      // 3. Create the duplicated funnel
+      const { data: newFunnel, error: createError } = await supabase
+        .from('funnels')
+        .insert({
+          name: `${originalFunnel.name} (cópia)`,
+          description: originalFunnel.description,
+          color: originalFunnel.color,
+          user_id: user!.id,
+          order_position: originalFunnel.order_position,
+          is_favorite: false,
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // 4. Duplicate all steps for the new funnel
+      if (originalSteps && originalSteps.length > 0) {
+        const newSteps = originalSteps.map(step => ({
+          funnel_id: newFunnel.id,
+          type: step.type,
+          content: step.content,
+          delay_minutes: step.delay_minutes,
+          show_typing: step.show_typing,
+          order_position: step.order_position,
+          file_url: step.file_url,
+          file_name: step.file_name,
+          question_settings: step.question_settings,
+        }));
+
+        const { error: insertStepsError } = await supabase
+          .from('funnel_steps')
+          .insert(newSteps);
+
+        if (insertStepsError) throw insertStepsError;
+      }
+
+      return newFunnel;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['funnels'] });
+      toast({ title: "Funil duplicado!", description: "O funil foi duplicado com sucesso." });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao duplicar funil." });
+    },
+  });
+}
+
+export function useRenameFunnel() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { data, error } = await supabase
+        .from('funnels')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as unknown as Funnel;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['funnels'] });
+      toast({ title: "Funil renomeado!" });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao renomear funil." });
     },
   });
 }
