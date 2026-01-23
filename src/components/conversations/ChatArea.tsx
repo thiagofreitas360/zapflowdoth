@@ -139,9 +139,9 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="h-[var(--header-height)] flex items-center justify-between px-6 border-b border-border bg-card">
+    <div className="h-full flex flex-col bg-background overflow-hidden">
+      {/* Header - Fixed height */}
+      <div className="h-[var(--header-height)] flex-shrink-0 flex items-center justify-between px-6 border-b border-border bg-card">
         <div className="flex items-center gap-3">
           {lead.avatar ? (
             <img 
@@ -196,8 +196,8 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      {/* Messages - Flexible, takes remaining space, scrollable */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
         {messages.map((message, index) => (
           <div
             key={message.id}
@@ -229,8 +229,8 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
         ))}
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-border bg-card">
+      {/* Input Area - Fixed at bottom */}
+      <div className="flex-shrink-0 p-4 border-t border-border bg-card">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground flex-shrink-0">
             <Paperclip className="w-5 h-5" />
@@ -255,14 +255,16 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
         </div>
       </div>
 
-      {/* Funnel Quick Actions - Below input */}
-      <FunnelQuickActions 
-        funnels={funnels} 
-        filterText={inputValue}
-        activeFunnel={activeFunnel}
-        onTrigger={handleTriggerFunnel}
-        onCancelFunnel={handleCancelFunnel}
-      />
+      {/* Funnel Quick Actions - Fixed at very bottom, with internal horizontal scroll only */}
+      <div className="flex-shrink-0">
+        <FunnelQuickActions 
+          funnels={funnels} 
+          filterText={inputValue}
+          activeFunnel={activeFunnel}
+          onTrigger={handleTriggerFunnel}
+          onCancelFunnel={handleCancelFunnel}
+        />
+      </div>
     </div>
   );
 }

@@ -40,9 +40,9 @@ export function LeadList({ leads, selectedLeadId, onSelectLead, onTogglePin }: L
   const pinnedCount = leads.filter((l) => l.isPinned).length;
 
   return (
-    <div className="h-full flex flex-col border-r border-border bg-card">
-      {/* Search Header */}
-      <div className="p-4 border-b border-border">
+    <div className="h-full flex flex-col border-r border-border bg-card overflow-hidden">
+      {/* Search Header - Fixed */}
+      <div className="flex-shrink-0 p-4 border-b border-border">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -54,8 +54,8 @@ export function LeadList({ leads, selectedLeadId, onSelectLead, onTogglePin }: L
         </div>
       </div>
 
-      {/* Leads */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Leads - Scrollable */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {sortedLeads.map((lead, index) => (
           <div
             key={lead.id}

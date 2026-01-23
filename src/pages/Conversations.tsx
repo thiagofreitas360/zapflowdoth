@@ -43,8 +43,8 @@ export default function Conversations() {
   };
 
   return (
-    <div className="h-screen flex">
-      <div className="w-[360px] flex-shrink-0">
+    <div className="h-full flex overflow-hidden">
+      <div className="w-[360px] flex-shrink-0 h-full overflow-hidden">
         <LeadList
           leads={leadsList}
           selectedLeadId={selectedLeadId}
@@ -52,7 +52,7 @@ export default function Conversations() {
           onTogglePin={handleTogglePin}
         />
       </div>
-      <div className="flex-1">
+      <div className="flex-1 h-full overflow-hidden">
         <ChatArea
           lead={selectedLead}
           messages={leadMessages}
