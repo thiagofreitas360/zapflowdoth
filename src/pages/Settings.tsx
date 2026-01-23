@@ -7,19 +7,19 @@ import {
   ExternalLink, 
   Users, 
   TrendingUp, 
-  Calendar,
   Tag,
   Plus,
   Trash2,
   ShoppingCart,
-  Target
+  Target,
+  Loader2,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { leads, defaultLabels, LeadLabel } from "@/data/mockData";
 import {
   Select,
   SelectContent,
@@ -34,17 +34,34 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useSettings, useUpdateSettings, useUpdateMetaApiSettings, useCheckMetaApiStatus } from "@/hooks/useSettings";
+import { useLabels, useCreateLabel, useDeleteLabel } from "@/hooks/useLabels";
+import { useLeads } from "@/hooks/useLeads";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 type DateRange = "today" | "week" | "month" | "custom";
 
 export default function Settings() {
+  const { user, signOut } = useAuth();
+  const { data: settings, isLoading: settingsLoading } = useSettings();
+  const { data: labels = [] } = useLabels();
+  const { data: leads = [] } = useLeads();
+  const updateSettings = useUpdateSettings();
+  const updateMetaApi = useUpdateMetaApiSettings();
+  const checkMetaStatus = useCheckMetaApiStatus();
+  const createLabel = useCreateLabel();
+  const deleteLabel = useDeleteLabel();
+  const { toast } = useToast();
+
   const [dateRange, setDateRange] = useState<DateRange>("today");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
-  const [labels, setLabels] = useState<LeadLabel[]>(defaultLabels);
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6E56CF");
   const [isAddingLabel, setIsAddingLabel] = useState(false);
+  const [metaApiKey, setMetaApiKey] = useState("");
+  const [phoneId, setPhoneId] = useState("");
 
   // Calculate metrics based on date range
   const metrics = useMemo(() => {
@@ -53,8 +70,7 @@ export default function Settings() {
     
     const getStartDate = () => {
       switch (dateRange) {
-        case "today":
-          return today;
+        case "today": return today;
         case "week":
           const weekAgo = new Date(now);
           weekAgo.setDate(weekAgo.getDate() - 7);
@@ -63,10 +79,8 @@ export default function Settings() {
           const monthAgo = new Date(now);
           monthAgo.setMonth(monthAgo.getMonth() - 1);
           return monthAgo.toISOString().split("T")[0];
-        case "custom":
-          return customStart || today;
-        default:
-          return today;
+        case "custom": return customStart || today;
+        default: return today;
       }
     };
 
@@ -74,57 +88,86 @@ export default function Settings() {
     const endDate = dateRange === "custom" && customEnd ? customEnd : today;
 
     const filteredLeads = leads.filter((lead) => {
-      const arrivalDate = lead.arrivalDate;
+      const arrivalDate = lead.arrival_date;
       return arrivalDate >= startDate && arrivalDate <= endDate;
     });
 
     const totalLeads = filteredLeads.length;
-    const metaAdsLeads = filteredLeads.filter((l) => l.arrivalSource === "meta_ads").length;
-    const organicLeads = filteredLeads.filter((l) => l.arrivalSource === "organic").length;
-    const referralLeads = filteredLeads.filter((l) => l.arrivalSource === "referral").length;
-    const purchasedLeads = filteredLeads.filter((l) => l.hasPurchased).length;
+    const metaAdsLeads = filteredLeads.filter((l) => l.arrival_source === "meta_ads").length;
+    const organicLeads = filteredLeads.filter((l) => l.arrival_source === "organic").length;
+    const referralLeads = filteredLeads.filter((l) => l.arrival_source === "referral").length;
+    const purchasedLeads = filteredLeads.filter((l) => l.has_purchased).length;
     const conversionRate = totalLeads > 0 ? ((purchasedLeads / totalLeads) * 100).toFixed(1) : "0";
 
-    return {
-      totalLeads,
-      metaAdsLeads,
-      organicLeads,
-      referralLeads,
-      purchasedLeads,
-      conversionRate,
-    };
-  }, [dateRange, customStart, customEnd]);
+    return { totalLeads, metaAdsLeads, organicLeads, referralLeads, purchasedLeads, conversionRate };
+  }, [dateRange, customStart, customEnd, leads]);
 
-  const handleAddLabel = () => {
+  const handleAddLabel = async () => {
     if (!newLabelName.trim()) return;
     
-    const newLabel: LeadLabel = {
-      id: `l${Date.now()}`,
-      name: newLabelName.trim(),
-      color: newLabelColor,
-    };
+    try {
+      await createLabel.mutateAsync({ name: newLabelName.trim(), color: newLabelColor });
+      setNewLabelName("");
+      setNewLabelColor("#6E56CF");
+      setIsAddingLabel(false);
+      toast({ title: "Etiqueta criada!" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao criar etiqueta." });
+    }
+  };
+
+  const handleDeleteLabel = async (labelId: string) => {
+    try {
+      await deleteLabel.mutateAsync(labelId);
+      toast({ title: "Etiqueta removida!" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao remover." });
+    }
+  };
+
+  const handleSaveMetaApi = async () => {
+    if (!metaApiKey.trim() || !phoneId.trim()) return;
     
-    setLabels([...labels, newLabel]);
-    setNewLabelName("");
-    setNewLabelColor("#6E56CF");
-    setIsAddingLabel(false);
+    try {
+      await updateMetaApi.mutateAsync({ meta_api_key: metaApiKey, phone_id: phoneId });
+      setMetaApiKey("");
+      setPhoneId("");
+      toast({ title: "Configurações da Meta API salvas!" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao salvar." });
+    }
   };
 
-  const handleDeleteLabel = (labelId: string) => {
-    setLabels(labels.filter((l) => l.id !== labelId));
+  const handleCheckMetaStatus = async () => {
+    try {
+      const result = await checkMetaStatus.mutateAsync();
+      if (result.configured) {
+        toast({ title: "Meta API configurada!", description: "Conexão funcionando." });
+      } else {
+        toast({ variant: "destructive", title: "Meta API não configurada", description: "Configure suas credenciais." });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao verificar status." });
+    }
   };
 
-  const dateRangeLabels: Record<DateRange, string> = {
-    today: "Hoje",
-    week: "Últimos 7 dias",
-    month: "Último mês",
-    custom: "Personalizado",
+  const handleUpdateNotifications = async (field: string, value: boolean) => {
+    await updateSettings.mutateAsync({ [field]: value });
   };
 
-  const predefinedColors = [
-    "#00B37E", "#F59E0B", "#EF4444", "#3B82F6", 
-    "#8B5CF6", "#EC4899", "#06B6D4", "#6E56CF"
-  ];
+  const handleUpdateProfile = async (field: string, value: string) => {
+    await updateSettings.mutateAsync({ [field]: value });
+  };
+
+  const predefinedColors = ["#00B37E", "#F59E0B", "#EF4444", "#3B82F6", "#8B5CF6", "#EC4899", "#06B6D4", "#6E56CF"];
+
+  if (settingsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-8 max-w-4xl">
@@ -145,48 +188,32 @@ export default function Settings() {
               <h3 className="font-semibold text-lg">Métricas de Leads</h3>
               <p className="text-sm text-muted-foreground">Acompanhe a chegada e conversão dos seus leads</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-                <SelectTrigger className="w-40 bg-secondary border-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Hoje</SelectItem>
-                  <SelectItem value="week">Últimos 7 dias</SelectItem>
-                  <SelectItem value="month">Último mês</SelectItem>
-                  <SelectItem value="custom">Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+              <SelectTrigger className="w-40 bg-secondary border-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="week">Últimos 7 dias</SelectItem>
+                <SelectItem value="month">Último mês</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Custom date range inputs */}
           {dateRange === "custom" && (
             <div className="flex gap-4 mb-6 p-4 bg-secondary/50 rounded-lg">
               <div className="flex-1">
                 <Label htmlFor="startDate">Data inicial</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="mt-2 bg-background border-0"
-                />
+                <Input id="startDate" type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="mt-2 bg-background border-0" />
               </div>
               <div className="flex-1">
                 <Label htmlFor="endDate">Data final</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="mt-2 bg-background border-0"
-                />
+                <Input id="endDate" type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="mt-2 bg-background border-0" />
               </div>
             </div>
           )}
 
-          {/* Metrics Grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg bg-secondary/50 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
@@ -195,7 +222,6 @@ export default function Settings() {
               </div>
               <p className="text-3xl font-bold text-foreground">{metrics.totalLeads}</p>
             </div>
-
             <div className="p-4 rounded-lg bg-secondary/50 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Target className="w-5 h-5 text-blue-500" />
@@ -203,7 +229,6 @@ export default function Settings() {
               </div>
               <p className="text-3xl font-bold text-foreground">{metrics.metaAdsLeads}</p>
             </div>
-
             <div className="p-4 rounded-lg bg-secondary/50 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <TrendingUp className="w-5 h-5 text-green-500" />
@@ -211,7 +236,6 @@ export default function Settings() {
               </div>
               <p className="text-3xl font-bold text-foreground">{metrics.organicLeads}</p>
             </div>
-
             <div className="p-4 rounded-lg bg-secondary/50 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Users className="w-5 h-5 text-purple-500" />
@@ -219,7 +243,6 @@ export default function Settings() {
               </div>
               <p className="text-3xl font-bold text-foreground">{metrics.referralLeads}</p>
             </div>
-
             <div className="p-4 rounded-lg bg-accent/10 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <ShoppingCart className="w-5 h-5 text-accent" />
@@ -227,7 +250,6 @@ export default function Settings() {
               </div>
               <p className="text-3xl font-bold text-accent">{metrics.purchasedLeads}</p>
             </div>
-
             <div className="p-4 rounded-lg bg-primary/10 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <TrendingUp className="w-5 h-5 text-primary" />
@@ -262,13 +284,7 @@ export default function Settings() {
                 <div className="space-y-4 py-4">
                   <div>
                     <Label htmlFor="labelName">Nome da etiqueta</Label>
-                    <Input
-                      id="labelName"
-                      value={newLabelName}
-                      onChange={(e) => setNewLabelName(e.target.value)}
-                      placeholder="Ex: Cliente VIP"
-                      className="mt-2 bg-secondary border-0"
-                    />
+                    <Input id="labelName" value={newLabelName} onChange={(e) => setNewLabelName(e.target.value)} placeholder="Ex: Cliente VIP" className="mt-2 bg-secondary border-0" />
                   </div>
                   <div>
                     <Label>Cor</Label>
@@ -276,35 +292,21 @@ export default function Settings() {
                       {predefinedColors.map((color) => (
                         <button
                           key={color}
-                          className={`w-8 h-8 rounded-full border-2 transition-all ${
-                            newLabelColor === color ? "border-foreground scale-110" : "border-transparent"
-                          }`}
+                          className={`w-8 h-8 rounded-full border-2 transition-all ${newLabelColor === color ? "border-foreground scale-110" : "border-transparent"}`}
                           style={{ backgroundColor: color }}
                           onClick={() => setNewLabelColor(color)}
                         />
                       ))}
-                      <Input
-                        type="color"
-                        value={newLabelColor}
-                        onChange={(e) => setNewLabelColor(e.target.value)}
-                        className="w-8 h-8 p-0 border-0 cursor-pointer"
-                      />
                     </div>
                   </div>
                   <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
                     <span className="text-sm text-muted-foreground">Preview:</span>
-                    <span
-                      className="px-3 py-1 text-sm font-medium rounded-full text-white"
-                      style={{ backgroundColor: newLabelColor }}
-                    >
+                    <span className="px-3 py-1 text-sm font-medium rounded-full text-white" style={{ backgroundColor: newLabelColor }}>
                       {newLabelName || "Nova Etiqueta"}
                     </span>
                   </div>
-                  <Button 
-                    className="w-full bg-primary hover:bg-primary/90"
-                    onClick={handleAddLabel}
-                    disabled={!newLabelName.trim()}
-                  >
+                  <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleAddLabel} disabled={!newLabelName.trim() || createLabel.isPending}>
+                    {createLabel.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     Criar Etiqueta
                   </Button>
                 </div>
@@ -314,20 +316,16 @@ export default function Settings() {
 
           <div className="flex flex-wrap gap-2">
             {labels.map((label) => (
-              <div
-                key={label.id}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-white group"
-                style={{ backgroundColor: label.color }}
-              >
+              <div key={label.id} className="flex items-center gap-2 px-3 py-1.5 rounded-full text-white group" style={{ backgroundColor: label.color }}>
                 <span className="text-sm font-medium">{label.name}</span>
-                <button
-                  onClick={() => handleDeleteLabel(label.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/20 rounded-full p-0.5"
-                >
+                <button onClick={() => handleDeleteLabel(label.id)} className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/20 rounded-full p-0.5">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
+            {labels.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhuma etiqueta criada</p>
+            )}
           </div>
         </Card>
 
@@ -346,23 +344,21 @@ export default function Settings() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="api-key">Chave da API</Label>
-              <Input
-                id="api-key"
-                type="password"
-                placeholder="Insira sua chave da API..."
-                className="mt-2 bg-secondary border-0"
-              />
+              <Input id="api-key" type="password" value={metaApiKey} onChange={(e) => setMetaApiKey(e.target.value)} placeholder="Insira sua chave da API..." className="mt-2 bg-secondary border-0" />
             </div>
             <div>
               <Label htmlFor="phone-id">ID do Número</Label>
-              <Input
-                id="phone-id"
-                placeholder="Ex: 123456789012345"
-                className="mt-2 bg-secondary border-0"
-              />
+              <Input id="phone-id" value={phoneId} onChange={(e) => setPhoneId(e.target.value)} placeholder="Ex: 123456789012345" className="mt-2 bg-secondary border-0" />
             </div>
             <div className="flex items-center gap-3">
-              <Button className="bg-primary hover:bg-primary/90">Salvar Configurações</Button>
+              <Button className="bg-primary hover:bg-primary/90" onClick={handleSaveMetaApi} disabled={!metaApiKey.trim() || !phoneId.trim() || updateMetaApi.isPending}>
+                {updateMetaApi.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Salvar Configurações
+              </Button>
+              <Button variant="outline" onClick={handleCheckMetaStatus} disabled={checkMetaStatus.isPending}>
+                {checkMetaStatus.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                Verificar Status
+              </Button>
               <Button variant="outline" className="gap-2">
                 <ExternalLink className="w-4 h-4" />
                 Documentação Meta
@@ -388,7 +384,8 @@ export default function Settings() {
               <Label htmlFor="name">Nome</Label>
               <Input
                 id="name"
-                defaultValue="Meu Negócio"
+                defaultValue={settings?.profile_name || ""}
+                onBlur={(e) => handleUpdateProfile("profile_name", e.target.value)}
                 className="mt-2 bg-secondary border-0"
               />
             </div>
@@ -397,7 +394,8 @@ export default function Settings() {
               <Input
                 id="email"
                 type="email"
-                defaultValue="contato@meunegocio.com"
+                defaultValue={settings?.email || user?.email || ""}
+                onBlur={(e) => handleUpdateProfile("email", e.target.value)}
                 className="mt-2 bg-secondary border-0"
               />
             </div>
@@ -422,26 +420,35 @@ export default function Settings() {
                 <p className="font-medium">Novas mensagens</p>
                 <p className="text-sm text-muted-foreground">Receba alertas quando um lead responder</p>
               </div>
-              <Switch defaultChecked />
+              <Switch 
+                checked={settings?.notify_new_messages ?? true} 
+                onCheckedChange={(v) => handleUpdateNotifications("notify_new_messages", v)} 
+              />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Conversões</p>
                 <p className="text-sm text-muted-foreground">Seja notificado sobre novas conversões</p>
               </div>
-              <Switch defaultChecked />
+              <Switch 
+                checked={settings?.notify_conversions ?? true} 
+                onCheckedChange={(v) => handleUpdateNotifications("notify_conversions", v)} 
+              />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Relatório semanal</p>
                 <p className="text-sm text-muted-foreground">Receba um resumo semanal por e-mail</p>
               </div>
-              <Switch />
+              <Switch 
+                checked={settings?.notify_weekly_report ?? false} 
+                onCheckedChange={(v) => handleUpdateNotifications("notify_weekly_report", v)} 
+              />
             </div>
           </div>
         </Card>
 
-        {/* Security */}
+        {/* Security / Logout */}
         <Card className="p-6 animate-fade-in" style={{ animationDelay: "500ms" }}>
           <div className="flex items-start gap-4 mb-6">
             <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -449,19 +456,17 @@ export default function Settings() {
             </div>
             <div>
               <h3 className="font-semibold text-lg">Segurança</h3>
-              <p className="text-sm text-muted-foreground">Proteja sua conta</p>
+              <p className="text-sm text-muted-foreground">Gerencie o acesso à sua conta</p>
             </div>
           </div>
 
           <div className="space-y-4">
-            <Button variant="outline">Alterar Senha</Button>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Autenticação em duas etapas</p>
-                <p className="text-sm text-muted-foreground">Adicione uma camada extra de segurança</p>
-              </div>
-              <Switch />
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Logado como: <span className="font-medium text-foreground">{user?.email}</span>
+            </p>
+            <Button variant="destructive" onClick={signOut}>
+              Sair da conta
+            </Button>
           </div>
         </Card>
       </div>
