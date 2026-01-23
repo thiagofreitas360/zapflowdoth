@@ -410,7 +410,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      settings_public: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string | null
+          notify_conversions: boolean | null
+          notify_new_messages: boolean | null
+          notify_weekly_report: boolean | null
+          profile_name: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id?: string | null
+          notify_conversions?: boolean | null
+          notify_new_messages?: boolean | null
+          notify_weekly_report?: boolean | null
+          profile_name?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string | null
+          notify_conversions?: boolean | null
+          notify_new_messages?: boolean | null
+          notify_weekly_report?: boolean | null
+          profile_name?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       user_owns_active_funnel: {
