@@ -13,7 +13,8 @@ import {
   ShoppingCart,
   Target,
   Loader2,
-  Check
+  Check,
+  Database
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -39,6 +40,7 @@ import { useLabels, useCreateLabel, useDeleteLabel } from "@/hooks/useLabels";
 import { useLeads } from "@/hooks/useLeads";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useSeedData } from "@/hooks/useSeedData";
 
 type DateRange = "today" | "week" | "month" | "custom";
 
@@ -52,6 +54,7 @@ export default function Settings() {
   const checkMetaStatus = useCheckMetaApiStatus();
   const createLabel = useCreateLabel();
   const deleteLabel = useDeleteLabel();
+  const seedData = useSeedData();
   const { toast } = useToast();
 
   const [dateRange, setDateRange] = useState<DateRange>("today");
@@ -157,6 +160,19 @@ export default function Settings() {
 
   const handleUpdateProfile = async (field: string, value: string) => {
     await updateSettings.mutateAsync({ [field]: value });
+  };
+
+  const handleSeedData = async () => {
+    try {
+      const result = await seedData.mutateAsync();
+      if (result.success) {
+        toast({ title: "Sucesso!", description: result.message });
+      } else {
+        toast({ variant: "destructive", title: "Aviso", description: result.message });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao criar dados de exemplo." });
+    }
   };
 
   const predefinedColors = ["#00B37E", "#F59E0B", "#EF4444", "#3B82F6", "#8B5CF6", "#EC4899", "#06B6D4", "#6E56CF"];
@@ -466,6 +482,34 @@ export default function Settings() {
             </p>
             <Button variant="destructive" onClick={signOut}>
               Sair da conta
+            </Button>
+          </div>
+        </Card>
+
+        {/* Seed Data (Dev/Testing) */}
+        <Card className="p-6 animate-fade-in border-dashed" style={{ animationDelay: "600ms" }}>
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
+              <Database className="w-6 h-6 text-accent" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Dados de Teste</h3>
+              <p className="text-sm text-muted-foreground">Popule o banco com dados de exemplo para testar a aplicação</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Isso criará leads, mensagens, funis, gatilhos e etiquetas de exemplo. Use apenas em ambientes de teste.
+            </p>
+            <Button 
+              onClick={handleSeedData} 
+              disabled={seedData.isPending}
+              className="bg-accent hover:bg-accent/90"
+            >
+              {seedData.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              <Database className="w-4 h-4 mr-2" />
+              Criar Dados de Exemplo
             </Button>
           </div>
         </Card>
