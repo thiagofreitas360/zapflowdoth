@@ -12,10 +12,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Lead, Message, Funnel, ActiveFunnel } from "@/data/mockData";
+import { Lead, Message, Funnel } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { FunnelQuickActions } from "./FunnelQuickActions";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveFunnels, useCreateActiveFunnel, useDeleteActiveFunnel } from "@/hooks/useActiveFunnels";
 
 interface ChatAreaProps {
   lead: Lead | null;
@@ -25,13 +26,19 @@ interface ChatAreaProps {
   onTriggerFunnel: (funnelId: string) => void;
 }
 
+interface LocalActiveFunnel {
+  funnelId: string;
+  leadId: string;
+  startTime: number;
+  remainingSeconds: number;
+  currentStep: number;
+}
+
 export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunnel }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
-  // Per-lead active funnels map: leadId -> ActiveFunnel
-  const [activeFunnelsMap, setActiveFunnelsMap] = useState<Map<string, ActiveFunnel>>(new Map());
+  const [activeFunnelsMap, setActiveFunnelsMap] = useState<Map<string, LocalActiveFunnel>>(new Map());
   const { toast } = useToast();
 
-  // Get active funnel for current lead
   const activeFunnel = lead ? activeFunnelsMap.get(lead.id) || null : null;
 
   // Countdown timer for all active funnels
@@ -47,7 +54,6 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
           if (funnel.remainingSeconds <= 1) {
             newMap.delete(leadId);
             hasChanges = true;
-            // Show toast only for current lead
             if (lead && leadId === lead.id) {
               toast({
                 title: "Funil concluído! ✅",
@@ -77,7 +83,6 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
   const handleTriggerFunnel = useCallback((funnelId: string) => {
     if (!lead) return;
     
-    // Check if THIS lead already has an active funnel
     const currentLeadFunnel = activeFunnelsMap.get(lead.id);
     if (currentLeadFunnel) {
       toast({
@@ -91,14 +96,13 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
     const funnel = funnels.find((f) => f.id === funnelId);
     if (!funnel) return;
 
-    // Set active funnel for this specific lead
     setActiveFunnelsMap((prev) => {
       const newMap = new Map(prev);
       newMap.set(lead.id, {
         funnelId,
         leadId: lead.id,
         startTime: Date.now(),
-        remainingSeconds: funnel.totalDurationSeconds,
+        remainingSeconds: funnel.total_duration_seconds,
         currentStep: 0,
       });
       return newMap;
@@ -108,7 +112,7 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
 
     toast({
       title: "Funil disparado! 🚀",
-      description: `"${funnel.name}" será enviado em ${funnel.totalDurationSeconds}s.`,
+      description: `"${funnel.name}" será enviado em ${funnel.total_duration_seconds}s.`,
     });
   }, [activeFunnelsMap, funnels, lead, onTriggerFunnel, toast]);
 
@@ -127,6 +131,11 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
     });
   }, [lead, toast]);
 
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  };
+
   if (!lead) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
@@ -140,18 +149,18 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden">
-      {/* Header - Fixed height */}
+      {/* Header */}
       <div className="h-[var(--header-height)] flex-shrink-0 flex items-center justify-between px-6 border-b border-border bg-card">
         <div className="flex items-center gap-3">
-          {lead.avatar ? (
+          {lead.avatar_url ? (
             <img 
-              src={lead.avatar} 
-              alt={lead.isSaved ? lead.name : lead.phone}
+              src={lead.avatar_url} 
+              alt={lead.is_saved ? lead.name || "" : lead.phone}
               className="w-10 h-10 rounded-full object-cover"
             />
           ) : (
             <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-              {lead.isSaved ? (
+              {lead.is_saved && lead.name ? (
                 <span className="font-semibold">
                   {lead.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
                 </span>
@@ -162,13 +171,12 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
           )}
           <div>
             <h2 className="font-semibold">
-              {lead.isSaved ? lead.name : lead.phone}
+              {lead.is_saved && lead.name ? lead.name : lead.phone}
             </h2>
-            {lead.isSaved && (
+            {lead.is_saved && lead.name && (
               <p className="text-xs text-muted-foreground">{lead.phone}</p>
             )}
-            {/* Labels in header */}
-            {lead.labels.length > 0 && (
+            {lead.labels && lead.labels.length > 0 && (
               <div className="flex gap-1 mt-0.5">
                 {lead.labels.map((label) => (
                   <span
@@ -196,40 +204,48 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
         </div>
       </div>
 
-      {/* Messages - Flexible, takes remaining space, scrollable */}
+      {/* Messages */}
       <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={message.id}
-            className={cn(
-              "flex animate-fade-in",
-              message.direction === "sent" ? "justify-end" : "justify-start"
-            )}
-            style={{ animationDelay: `${index * 50}ms` }}
-          >
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Nenhuma mensagem ainda</p>
+          </div>
+        ) : (
+          messages.map((message, index) => (
             <div
+              key={message.id}
               className={cn(
-                "max-w-[70%]",
-                message.direction === "sent" ? "chat-bubble-sent" : "chat-bubble-received"
+                "flex animate-fade-in",
+                message.direction === "sent" ? "justify-end" : "justify-start"
               )}
+              style={{ animationDelay: `${index * 50}ms` }}
             >
-              <p className="text-sm leading-relaxed">{message.content}</p>
-              <div className="flex items-center justify-end gap-1 mt-1">
-                <span className="text-[10px] text-muted-foreground">{message.timestamp}</span>
-                {message.direction === "sent" && (
-                  message.status === "read" ? (
-                    <CheckCheck className="w-3.5 h-3.5 text-accent" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5 text-muted-foreground" />
-                  )
+              <div
+                className={cn(
+                  "max-w-[70%]",
+                  message.direction === "sent" ? "chat-bubble-sent" : "chat-bubble-received"
                 )}
+              >
+                <p className="text-sm leading-relaxed">{message.content}</p>
+                <div className="flex items-center justify-end gap-1 mt-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatTime(message.timestamp)}
+                  </span>
+                  {message.direction === "sent" && (
+                    message.status === "read" ? (
+                      <CheckCheck className="w-3.5 h-3.5 text-accent" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5 text-muted-foreground" />
+                    )
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
-      {/* Input Area - Fixed at bottom */}
+      {/* Input Area */}
       <div className="flex-shrink-0 p-4 border-t border-border bg-card">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground flex-shrink-0">
@@ -255,7 +271,7 @@ export function ChatArea({ lead, messages, funnels, onSendMessage, onTriggerFunn
         </div>
       </div>
 
-      {/* Funnel Quick Actions - Fixed at very bottom, with internal horizontal scroll only */}
+      {/* Funnel Quick Actions */}
       <div className="flex-shrink-0">
         <FunnelQuickActions 
           funnels={funnels} 
