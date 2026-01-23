@@ -1,15 +1,22 @@
 import { useRef, useEffect } from "react";
 import { Workflow, ChevronRight, Sparkles, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Funnel, ActiveFunnel } from "@/data/mockData";
+import { Funnel } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
+interface LocalActiveFunnel {
+  funnelId: string;
+  leadId: string;
+  startTime: number;
+  remainingSeconds: number;
+  currentStep: number;
+}
 
 interface FunnelQuickActionsProps {
   funnels: Funnel[];
   filterText: string;
-  activeFunnel: ActiveFunnel | null;
+  activeFunnel: LocalActiveFunnel | null;
   onTrigger: (funnelId: string) => void;
   onCancelFunnel: () => void;
 }
@@ -23,14 +30,12 @@ export function FunnelQuickActions({
 }: FunnelQuickActionsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Filter funnels based on input text
   const filteredFunnels = filterText.trim()
     ? funnels.filter((f) => 
         f.name.toLowerCase().includes(filterText.toLowerCase())
       )
     : funnels;
 
-  // Enable horizontal scroll with mouse wheel
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
@@ -52,11 +57,10 @@ export function FunnelQuickActions({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
-  // Show active funnel status (per-lead lock)
   if (activeFunnel) {
     const funnel = funnels.find((f) => f.id === activeFunnel.funnelId);
     const progress = funnel 
-      ? ((funnel.totalDurationSeconds - activeFunnel.remainingSeconds) / funnel.totalDurationSeconds) * 100
+      ? ((funnel.total_duration_seconds - activeFunnel.remainingSeconds) / funnel.total_duration_seconds) * 100
       : 0;
 
     return (
@@ -96,25 +100,16 @@ export function FunnelQuickActions({
       <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground flex-shrink-0">
         <Workflow className="w-4 h-4" />
         <span>Funis rápidos:</span>
-        {filterText.trim() && (
-          <span className="text-primary text-xs">
-            (filtrando por "{filterText}")
-          </span>
-        )}
       </div>
       
       <div 
         ref={scrollRef}
         className="relative overflow-x-auto pb-2"
-        style={{ 
-          scrollbarWidth: "thin",
-          scrollbarColor: "hsl(var(--primary)) hsl(var(--secondary))"
-        }}
       >
         <div className="flex items-center gap-2 min-w-max">
           {filteredFunnels.length === 0 ? (
             <span className="text-sm text-muted-foreground italic py-2">
-              Nenhum funil encontrado para "{filterText}"
+              Nenhum funil encontrado
             </span>
           ) : (
             filteredFunnels.map((funnel) => (
@@ -136,37 +131,8 @@ export function FunnelQuickActions({
               </Button>
             ))
           )}
-          
-          {!filterText.trim() && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-shrink-0 text-primary hover:text-primary hover:bg-primary/10 whitespace-nowrap"
-            >
-              <Sparkles className="w-4 h-4 mr-1" />
-              Sugestão AI
-            </Button>
-          )}
         </div>
       </div>
-      
-      {/* Custom scrollbar styling */}
-      <style>{`
-        div[style*="scrollbar-width: thin"]::-webkit-scrollbar {
-          height: 6px;
-        }
-        div[style*="scrollbar-width: thin"]::-webkit-scrollbar-track {
-          background: hsl(var(--secondary));
-          border-radius: 3px;
-        }
-        div[style*="scrollbar-width: thin"]::-webkit-scrollbar-thumb {
-          background: hsl(var(--primary) / 0.5);
-          border-radius: 3px;
-        }
-        div[style*="scrollbar-width: thin"]::-webkit-scrollbar-thumb:hover {
-          background: hsl(var(--primary));
-        }
-      `}</style>
     </div>
   );
 }
