@@ -6,6 +6,7 @@ const navigation = [
   { name: "Funis", href: "/funnels", icon: Workflow },
   { name: "Gatilhos", href: "/triggers", icon: Tag },
   { name: "Estatísticas", href: "/stats", icon: BarChart3 },
+  { name: "Flow Builder", href: "/flow-builder", icon: GitBranch },
   { name: "Backups", href: "/backups", icon: HardDrive },
   { name: "Configurações", href: "/settings", icon: Settings },
 ];

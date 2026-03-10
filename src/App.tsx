@@ -33,6 +33,7 @@ const App = () => (
             <Route path="/stats" element={<ProtectedRoute><MainLayout><Stats /></MainLayout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
             <Route path="/backups" element={<ProtectedRoute><MainLayout><Backups /></MainLayout></ProtectedRoute>} />
+            <Route path="/flow-builder" element={<ProtectedRoute><FlowBuilder /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
