@@ -12,6 +12,7 @@ import Triggers from "./pages/Triggers";
 import Stats from "./pages/Stats";
 import Settings from "./pages/Settings";
 import Backups from "./pages/Backups";
+import FlowBuilder from "./pages/FlowBuilder";
 import NotFound from "./pages/NotFound";
 import { MainLayout } from "./components/layout/MainLayout";
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/stats" element={<ProtectedRoute><MainLayout><Stats /></MainLayout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
             <Route path="/backups" element={<ProtectedRoute><MainLayout><Backups /></MainLayout></ProtectedRoute>} />
+            <Route path="/flow-builder" element={<ProtectedRoute><FlowBuilder /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

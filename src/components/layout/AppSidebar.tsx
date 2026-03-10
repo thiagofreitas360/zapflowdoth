@@ -1,4 +1,4 @@
-import { MessageSquare, Workflow, Tag, BarChart3, Settings, Zap, HardDrive } from "lucide-react";
+import { MessageSquare, Workflow, Tag, BarChart3, Settings, Zap, HardDrive, GitBranch } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 const navigation = [
@@ -6,6 +6,7 @@ const navigation = [
   { name: "Funis", href: "/funnels", icon: Workflow },
   { name: "Gatilhos", href: "/triggers", icon: Tag },
   { name: "Estatísticas", href: "/stats", icon: BarChart3 },
+  { name: "Flow Builder", href: "/flow-builder", icon: GitBranch },
   { name: "Backups", href: "/backups", icon: HardDrive },
   { name: "Configurações", href: "/settings", icon: Settings },
 ];
