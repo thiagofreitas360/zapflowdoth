@@ -1,4 +1,4 @@
-import { MessageSquare, Workflow, Tag, BarChart3, Settings, Zap, HardDrive } from "lucide-react";
+import { MessageSquare, Workflow, Tag, BarChart3, Settings, Zap, HardDrive, GitBranch } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 const navigation = [
