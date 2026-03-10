@@ -12,6 +12,7 @@ import Triggers from "./pages/Triggers";
 import Stats from "./pages/Stats";
 import Settings from "./pages/Settings";
 import Backups from "./pages/Backups";
+import FlowBuilder from "./pages/FlowBuilder";
 import NotFound from "./pages/NotFound";
 import { MainLayout } from "./components/layout/MainLayout";
 
